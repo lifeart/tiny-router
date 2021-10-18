@@ -1,23 +1,15 @@
-# Nano Stores Router
+# Tiny Router
 
-<img align="right" width="92" height="92" title="Nano Stores logo"
-     src="https://nanostores.github.io/nanostores/logo.svg">
+A tiny URL router for any app;
 
-A tiny URL router for [Nano Stores](https://github.com/nanostores/nanostores)
-state manager.
-
-* **Small.** 751 bytes (minified and gzipped).
-  Zero dependencies. It uses [Size Limit] to control size.
+* Zero dependencies.
 * It has good **TypeScript** support.
 * Framework agnostic. Can be used for **React**, **Preact**, **Vue**,
   **Svelte**, and vanilla JS.
 
-Since Nano Stores promote moving logic to store, the router is a store,
-not a component in UI framework like React.
-
 ```ts
-// stores/router.ts
-import { createRouter } from '@nanostores/router'
+// router.ts
+import { Router } from '@lifeart/tiny-router';
 
 // Types for :params in route templates
 interface Routes {
@@ -26,55 +18,60 @@ interface Routes {
   post: 'categoryId' | 'id'
 }
 
-export const router = createRouter<Routes>({
+export const router = new Router<Routes>({
   home: '/',
   category: '/posts/:categoryId',
   post: '/posts/:categoryId/:id'
 })
+
+router.addResolver('post', async function(page) {
+  const request = await fetch(`/api/pages/${page.params.id}`);
+  const data = await request.json();
+
+  return data;
+});
 ```
 
 Store in active mode listen for `<a>` clicks on `document.body` and Back button
 in browser.
 
 ```tsx
-// components/layout.tsx
-import { useStore } from 'nanostores/react'
+// components/layout.js
+import type { Page } from '@lifeart/tiny-router';
+import { router } from './router.ts';
+import { tracked } from '@glimmer/tracking';
 
-import { router } from '../stores/router.js'
+import NotFoundComponent from './components/pages/not-found.hbs';
+import Main from './components/pages/main';
 
-export const Layout = () => {
-  const page = useStore(router)
-  if (page.route === 'home') {
-    return <HomePage />
-  } else if (page.route === 'category') {
-    return <CategoryPage categoryId={page.params.categoryId} />
-  } else if (page.route === 'post') {
-    return <PostPage postId={page.params.postId} />
-  } else {
-    return <Error404 />
+class RouteComponent extends Component {
+  router = router.addHandler((page) = this.navigate(page));
+  @tracked page!: Page;
+  navigate(page: Page) {
+    this.page = page;
+  }
+  get routeComponent() {
+    if (!this.page) {
+      return NotFoundComponent;
+    } else {
+      return Main;
+    }
   }
 }
 ```
-
-<a href="https://evilmartians.com/?utm_source=logux-client">
-  <img src="https://evilmartians.com/badges/sponsored-by-evil-martians.svg"
-       alt="Sponsored by Evil Martians" width="236" height="54">
-</a>
-
-[Size Limit]: https://github.com/ai/size-limit
 
 
 ## Install
 
 ```sh
-npm install nanostores @nanostores/router
+yarn add @lifeart/tiny-router
 ```
 
 
 ## Usage
 
-See [Nano Stores docs](https://github.com/nanostores/nanostores#guide)
-about using the store and subscribing to store’s changes in UI frameworks.
+See [Tiny Router docs](https://github.com/lifeart/tiny-router#guide)
+about using the router and subscribing to changes in UI frameworks.
 
 
 ### Routes
@@ -82,7 +79,7 @@ about using the store and subscribing to store’s changes in UI frameworks.
 Routes is an object of route’s name to route pattern:
 
 ```ts
-createRouter({
+new Router({
   route1: '/',
   route2: '/path/:var1/and/:var2',
   route3: [/\/posts\/(draft|new)\/(\d+)/, (type, id) => ({ type, id })]
@@ -101,7 +98,7 @@ interface Routes {
   routeName: 'var1' | 'var2'
 }
 
-createRouter<Routes>({
+new Router<Routes>({
   routeName: '/path/:var1/and/:var2'
 })
 ```
@@ -113,7 +110,7 @@ Using `getPagePath()` avoids hard coding URL in templates. It is better
 to use the router as a single place of truth.
 
 ```tsx
-import { getPagePath } from '@nanostores/router'
+import { getPagePath } from '@lifeart/tiny-router'
 
 …
   <a href={getPagePath(router, 'post', { categoryId: 'guides', id: '10' })}>
@@ -123,7 +120,7 @@ If you need to change URL programmatically you can use `openPage`
 or `redirectPage`:
 
 ```ts
-import { openPage, redirectPage } from '@nanostores/router'
+import { openPage, redirectPage } from '@lifeart/tiny-router'
 
 function requireLogin () {
   openPage(router, 'login')

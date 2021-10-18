@@ -1,47 +1,31 @@
 {
-  "name": "@nanostores/router",
-  "version": "0.1.1",
-  "description": "A tiny (751 bytes) router for Nano Stores state manager",
+  "name": "@lifeart/tiny-router",
+  "version": "0.0.1",
+  "description": "A tiny router for Glimmer applications",
   "keywords": [
-    "nano",
+    "tiny",
     "router",
-    "react",
-    "preact",
-    "vue",
-    "svelte",
-    "store"
+    "glimmer"
   ],
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/.bin/jest --coverage && eslint . && check-dts && size-limit && yaspeller *.md"
+    "build:cjs":  "npx esbuild index.ts --format=cjs --outfile=index.cjs.js",
+    "build:module":  "npx esbuild index.ts --format=esm --outfile=index.module.js",
+    "build": "yarn build:cjs && yarn build:module"
   },
-  "author": "Andrey Sitnik <andrey@sitnik.ru>",
+  "author": "Aleksandr Kanunnikov <lifeart92@gmail.com>",
   "license": "MIT",
-  "repository": "nanostores/router",
+  "repository": "lifeart/tiny-route",
   "sideEffects": false,
   "type": "module",
-  "types": "./index.d.ts",
-  "exports": {
-    ".": "./index.js",
-    "./package.json": "./package.json"
-  },
+  "main": "index.cjs.js",
+  "module": "index.module.js",
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
-  },
-  "peerDependencies": {
-    "nanostores": "^0.4.0"
+    "node": "^12.16.0 || ^14.0.0 || >=16.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.15.8",
-    "@logux/core": "^0.7.2",
-    "@logux/eslint-config": "^46.0.0",
-    "@logux/sharec-config": "^0.12.2",
-    "@size-limit/preset-small-lib": "^6.0.3",
-    "@types/jest": "^27.0.2",
     "@types/node": "^16.11.1",
-    "@typescript-eslint/eslint-plugin": "^5.0.0",
-    "@typescript-eslint/parser": "^5.0.0",
-    "check-dts": "^0.6.1",
-    "clean-publish": "^3.4.1",
+    "@typescript-eslint/eslint-plugin": "^5.1.0",
+    "@typescript-eslint/parser": "^5.1.0",
     "eslint": "^8.0.1",
     "eslint-config-standard": "^16.0.3",
     "eslint-plugin-import": "^2.25.2",
@@ -51,18 +35,8 @@
     "eslint-plugin-promise": "^5.1.0",
     "eslint-plugin-security": "^1.4.0",
     "eslint-plugin-unicorn": "^37.0.1",
-    "jest": "^27.3.0",
-    "lint-staged": "^11.2.3",
-    "nanostores": "nanostores/nanostores#next",
     "prettier": "^2.4.1",
-    "simple-git-hooks": "^2.6.1",
-    "size-limit": "^6.0.3",
-    "ts-jest": "^27.0.7",
-    "typescript": "^4.4.4",
-    "yaspeller": "^7.2.0"
-  },
-  "simple-git-hooks": {
-    "pre-commit": "npx lint-staged"
+    "typescript": "^4.4.4"
   },
   "prettier": {
     "arrowParens": "avoid",
@@ -72,79 +46,10 @@
     "singleQuote": true,
     "trailingComma": "none"
   },
-  "lint-staged": {
-    "*.md": "yaspeller",
-    "*.js": [
-      "prettier --write",
-      "eslint --fix"
-    ],
-    "*.ts": [
-      "prettier --write",
-      "eslint --fix"
-    ]
-  },
-  "jest": {
-    "preset": "ts-jest/presets/default-esm",
-    "globals": {
-      "ts-jest": {
-        "useESM": true,
-        "isolatedModules": true
-      }
-    },
-    "testEnvironment": "jsdom",
-    "coverageThreshold": {
-      "global": {
-        "statements": 100
-      }
-    }
-  },
-  "eslintConfig": {
-    "extends": "@logux/eslint-config/esm",
-    "rules": {
-      "@typescript-eslint/unified-signatures": "off",
-      "@typescript-eslint/no-explicit-any": "off",
-      "symbol-description": "off",
-      "consistent-return": "off",
-      "camelcase": "off"
-    },
-    "globals": {
-      "jsdom": false
-    }
-  },
   "eslintIgnore": [
     "**/errors.ts"
   ],
-  "size-limit": [
-    {
-      "import": {
-        "./index.js": "{ createRouter }"
-      },
-      "limit": "751 B"
-    }
-  ],
-  "clean-publish": {
-    "cleanDocs": true
-  },
-  "yaspeller": {
-    "lang": "en",
-    "ignoreCapitalization": true,
-    "ignoreText": [
-      " \\(by [^)]+\\).",
-      "\\d+\\.\\d+ “[^”]+”"
-    ],
-    "dictionary": [
-      "Versioning",
-      "UI",
-      "programmatically",
-      "gzipped",
-      "Preact",
-      "Vue",
-      "JS",
-      "RegExp"
-    ]
-  },
-  "sharec": {
-    "config": "@logux/sharec-config",
-    "version": "0.12.2"
+  "volta": {
+    "node": "14.18.1"
   }
 }
