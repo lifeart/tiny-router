@@ -42,20 +42,14 @@ import { router } from './router.ts';
 import { tracked } from '@glimmer/tracking';
 
 import NotFoundComponent from './components/pages/not-found.hbs';
-import Main from './components/pages/main';
 
 class RouteComponent extends Component {
-  router = router.addHandler((page) = this.navigate(page));
+  router = router.addHandler((page, data) = this.navigate(page, data))
   @tracked page!: Page;
-  navigate(page: Page) {
+  @tracked routeComponent!: Component;
+  navigate(page: Page, data: Component) {
     this.page = page;
-  }
-  get routeComponent() {
-    if (!this.page) {
-      return NotFoundComponent;
-    } else {
-      return Main;
-    }
+    this.routeComponent = data || NotFoundComponent;
   }
 }
 ```

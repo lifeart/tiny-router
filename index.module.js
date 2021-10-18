@@ -1,8 +1,10 @@
 class Router {
   constructor(routes) {
-    this.handlers = [];
-    this.resolvers = {};
     this._handlers = [];
+    this._resolvers = {};
+    this.activeRoute = null;
+    this.prevRoute = null;
+    this._domHandlers = [];
     this.prev = "";
     this.routes = Object.keys(routes).map((name) => {
       let value = routes[name];
@@ -38,18 +40,27 @@ class Router {
     return false;
   }
   addResolver(routeName, fn) {
-    this.resolvers[routeName] = fn;
+    this._resolvers[routeName] = fn;
+    return this;
   }
   addHandler(fn) {
-    this.handlers.push(fn);
-    return this;
+    this._handlers.push(fn);
+    try {
+      return this;
+    } finally {
+      if (this.activeRoute) {
+        fn(this.activeRoute.page, this.activeRoute.data);
+      }
+    }
   }
   async navigate(page) {
     let data = null;
-    if (page.route in this.resolvers) {
-      data = await this.resolvers[page.route](page.params);
+    if (page.route in this._resolvers) {
+      data = await this._resolvers[page.route](page.params);
     }
-    this.handlers.forEach((fn) => fn(page, data));
+    this.prevRoute = this.activeRoute;
+    this.activeRoute = { page, data };
+    this._handlers.forEach((fn) => fn(page, data));
   }
   async open(path, redirect) {
     let page = this.parse(path);
@@ -100,9 +111,9 @@ class Router {
         return this.popstate();
       };
       document.body.addEventListener("click", onClick);
-      this._handlers.push([document.body, "click", onClick]);
+      this._domHandlers.push([document.body, "click", onClick]);
       window.addEventListener("popstate", popState);
-      this._handlers.push([window, "popstate", popState]);
+      this._domHandlers.push([window, "popstate", popState]);
     }
     let page = this.parse(path);
     if (page !== false) {
@@ -110,9 +121,13 @@ class Router {
     }
   }
   unmount() {
-    this._handlers.forEach(([element, eventName, fn]) => {
+    this._domHandlers.forEach(([element, eventName, fn]) => {
       element.removeEventListener(eventName, fn);
     });
+    this.activeRoute = null;
+    this.prevRoute = null;
+    this._resolvers = {};
+    this._handlers = [];
   }
 }
 function getPagePath(router, name, params) {

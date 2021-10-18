@@ -1,6 +1,6 @@
 {
   "name": "@lifeart/tiny-router",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A tiny router for Glimmer applications",
   "keywords": [
     "tiny",

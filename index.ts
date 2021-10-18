@@ -48,23 +48,35 @@ export class Router {
 
     return false;
   }
-  handlers: Array<(page: Page, data?: any) => void> = [];
-  resolvers: Record<string, (params: RouteParams) => Promise<any>> = {};
-  addResolver(routeName: string, fn: (params: RouteParams) => Promise<any>) {
-    this.resolvers[routeName] = fn;
-  }
-  addHandler(fn: (page: Page, data?: any) => void): Router {
-    this.handlers.push(fn);
+  _handlers: Array<(page: Page, data?: any) => void> = [];
+  _resolvers: Record<string, (params: RouteParams) => Promise<any>> = {};
+  addResolver(routeName: string, fn: (params: RouteParams) => Promise<any>): Router {
+    this._resolvers[routeName] = fn;
     return this;
   }
+  addHandler(fn: (page: Page, data?: any) => void): Router {
+    this._handlers.push(fn);
+
+    try {
+      return this;
+    } finally {
+      if (this.activeRoute) {
+        fn(this.activeRoute.page, this.activeRoute.data);
+      }
+    }
+  }
+  activeRoute: null | { page: Page, data: any } = null;
+  prevRoute: null | { page: Page, data: any } = null;
   async navigate(page: Page) {
     let data: any = null;
 
-    if (page.route in this.resolvers) {
-      data = await this.resolvers[page.route](page.params);
+    if (page.route in this._resolvers) {
+      data = await this._resolvers[page.route](page.params);
     }
 
-    this.handlers.forEach((fn) => fn(page, data));
+    this.prevRoute = this.activeRoute;
+    this.activeRoute = { page: page, data };
+    this._handlers.forEach((fn) => fn(page, data));
   }
   async open(path: string, redirect?: boolean) {
     let page = this.parse(path);
@@ -115,7 +127,7 @@ export class Router {
       }
     }
   }
-  _handlers: [HTMLElement | Window, string, (e: any) => any ][] = [];
+  _domHandlers: [HTMLElement | Window, string, (e: any) => any ][] = [];
   async mount(path = typeof location !== undefined ? location.pathname : '/', ssr = false) {
     if (!ssr) {
       if (typeof window === 'undefined') {
@@ -128,9 +140,9 @@ export class Router {
         return this.popstate();
       }
       document.body.addEventListener('click', onClick);
-      this._handlers.push([document.body, 'click', onClick]);
+      this._domHandlers.push([document.body, 'click', onClick]);
       window.addEventListener('popstate', popState);
-      this._handlers.push([window, 'popstate', popState]);
+      this._domHandlers.push([window, 'popstate', popState]);
     }
 
     let page = this.parse(path);
@@ -139,9 +151,13 @@ export class Router {
     }
   }
   unmount() {
-    this._handlers.forEach(([element, eventName, fn]) => {
+    this._domHandlers.forEach(([element, eventName, fn]) => {
       element.removeEventListener(eventName, fn);
     });
+    this.activeRoute = null;
+    this.prevRoute = null;
+    this._resolvers = {};
+    this._handlers = [];
   }
 }
 
