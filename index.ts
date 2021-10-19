@@ -1,38 +1,43 @@
 export interface Page {
   path: string;
   route: string;
-  query: Record<string, string>;
+  query: QueryParams;
   params: RouteParams;
 }
 
 export type RouteParams = Record<string, string>;
+export type QueryParams = Record<string, string>;
+
+type RoteMeta = [string, RegExp, (...args: string[]) => RouteParams, string, string[]];
+type RouteResolvedData = { name: string, data: any };
 
 export class Router {
-  routes!: [string, RegExp, (...args: string[]) => RouteParams, string][];
+  routes: RoteMeta[] = [];
   prev!: string
+  _addRoute(value: RoteMeta) {
+    this.routes.push(value);
+  }
   constructor(routes: Record<string, string>) {
     this.prev = '';
-    this.routes = Object.keys(routes).map(name => {
+    Object.keys(routes).map(name => {
       let value = routes[name]
-      if (typeof value === 'string') {
-        value = value.replace(/\/$/g, '') || '/'
-        let names = (value.match(/\/:\w+/g) || []).map(i => i.slice(2))
-        let pattern = value
-          .replace(/[\s!#$()+,.:<=?[\\\]^{|}]/g, '\\$&')
-          .replace(/\/\\:\w+/g, '/([^/]+)')
-        return [
-          name,
-          RegExp('^' + pattern + '$', 'i'),
-          (...matches: string[]) =>
-            matches.reduce((params, match, index) => {
-              params[names[index]] = match
-              return params
-            }, {} as RouteParams),
-          value
-        ]
-      } else {
-        return [name, ...value];
-      }
+      value = value.replace(/\/$/g, '') || '/'
+      let names = (value.match(/\/:\w+/g) || []).map(i => i.slice(2))
+      let pattern = value
+        .replace(/[\s!#$()+,.:<=?[\\\]^{|}]/g, '\\$&')
+        .replace(/\/\\:\w+/g, '/([^/]+)');
+
+      this._addRoute([
+        name,
+        RegExp('^' + pattern + '$', 'i'),
+        (...matches: string[]) =>
+          matches.reduce((params, match, index) => {
+            params[names[index]] = match
+            return params
+          }, {} as RouteParams),
+        value,
+        names
+      ]);
     })
   }
   getQueryParams(str: string) {
@@ -61,35 +66,82 @@ export class Router {
 
     return false;
   }
-  _handlers: Array<(page: Page, data?: any) => void> = [];
-  _resolvers: Record<string, (params: RouteParams) => Promise<any>> = {};
+  _handlers: Array<(page: Page, data?: any, stack?: RouteResolvedData[]) => void> = [];
+  _resolvers: Record<string, (params: RouteParams, query: QueryParams) => Promise<any>> = {};
   addResolver(routeName: string, fn: (params: RouteParams) => Promise<any>): Router {
     this._resolvers[routeName] = fn;
     return this;
   }
-  addHandler(fn: (page: Page, data?: any) => void): Router {
+  addHandler(fn: (page: Page, data?: any, stack?: RouteResolvedData[]) => void): Router {
     this._handlers.push(fn);
 
     try {
       return this;
     } finally {
       if (this.activeRoute) {
-        fn(this.activeRoute.page, this.activeRoute.data);
+        fn(this.activeRoute.page, this.activeRoute.data, this.stack);
       }
     }
   }
   activeRoute: null | { page: Page, data: any } = null;
   prevRoute: null | { page: Page, data: any } = null;
+  _resolvedData: Record<string, { model: any, params: RouteParams }> = { };
+  dataForRoute(routeName: string) {
+    if (!(routeName in this._resolvedData)) {
+      return null;
+    }
+    return this._resolvedData[routeName].model;
+  }
+  async _resolveRoute(route: string, params: RouteParams, query: QueryParams) {
+    let data: any = null;
+    if (!this.shouldResolveRoute(route, params)) {
+      return this.dataForRoute(route);
+    }
+    if (route in this._resolvers) {
+      data = await this._resolvers[route](params, query);
+    }
+    return data;
+  }
+  shouldResolveRoute(name: string, params: RouteParams) {
+    if (!(name in this._resolvedData)) {
+      return true;
+    }
+    const value = this._resolvedData[name];
+    const route = this.routes.find(([routeName]) => name === routeName);
+    if (!route) {
+      throw new Error(`Unknown route: ${name}, for chained routes, ensure you have defined parents`);
+    }
+    if (route[4].some((key) => value.params[key] !== params[key])) {
+      return true;
+    }
+    return false;
+  }
+  stack: RouteResolvedData[] = [];
+  unloadRouteData(routeName: string) {
+    delete this._resolvedData[routeName];
+  }
   async navigate(page: Page) {
     let data: any = null;
 
-    if (page.route in this._resolvers) {
-      data = await this._resolvers[page.route](page.params);
+    let parts = page.route.split('.');
+    let routeParts = [];
+    let routeStack: RouteResolvedData[] = [];
+
+    while (parts.length) {
+      routeParts.push(parts.shift());
+      const routeToResolve = routeParts.join('.');
+      data = await this._resolveRoute(routeToResolve, page.params, page.query);
+      routeStack.push({name: routeToResolve, data });
+      this._resolvedData[routeToResolve] = {
+        model: data,
+        params: page.params
+      };
     }
 
     this.prevRoute = this.activeRoute;
     this.activeRoute = { page: page, data };
-    this._handlers.forEach((fn) => fn(page, data));
+    this.stack = routeStack;
+    this._handlers.forEach((fn) => fn(page, data, routeStack));
   }
   async open(path: string, redirect?: boolean) {
     let page = this.parse(path);
@@ -174,18 +226,26 @@ export class Router {
   }
 }
 
-export function getPagePath(router: Router, name: string, params: RouteParams ) {
+export function getPagePath(router: Router, name: string, params: RouteParams, query: QueryParams = {} ) {
   let route = router.routes.find(i => i[0] === name)
   if (!route) {
     throw new Error(`Unknown route: ${name}`);
   }
-  return route[3].replace(/\/:\w+/g, i => '/' + params[i.slice(2)])
+  const path = route[3].replace(/\/:\w+/g, i => '/' + params[i.slice(2)]);
+  const url = new URL(path);
+  if (Object.keys(query)) {
+    Object.keys(query).forEach((key) => {
+      url.searchParams.set(key, encodeURIComponent(query[key]));
+    })
+  }
+  // url.searchParams.set(key, encodeURIComponent(value));
+  return url.pathname + url.search;
 }
 
-export function openPage(router: Router, name: string, params: RouteParams ) {
-  router.open(getPagePath(router, name, params))
+export function openPage(router: Router, name: string, params: RouteParams, query?: QueryParams ) {
+  router.open(getPagePath(router, name, params, query))
 }
 
-export function redirectPage(router: Router, name: string, params: RouteParams ) {
-  router.open(getPagePath(router, name, params), true)
+export function redirectPage(router: Router, name: string, params: RouteParams, query?: QueryParams ) {
+  router.open(getPagePath(router, name, params, query), true)
 }

@@ -61,7 +61,7 @@ router.activeRoute.page.path === '/posts/42';
 Store in active mode listen for `<a>` clicks on `document.body` and Back button
 in browser.
 
-```tsx
+```ts
 // components/layout.js
 import type { Page } from '@lifeart/tiny-router';
 import { router } from './router.ts';
@@ -81,6 +81,101 @@ class RouteComponent extends Component {
 ```
 
 
+
+Stack based navigation:
+
+```ts
+import { Router } from '@lifeart/tiny-router';
+
+// lets define stack for route
+export const router = new Router<Routes>({
+  "users": '/users',
+  "users.user": '/users/:user',
+  "users.user.card": '/users/:user/:card'
+})
+
+```
+
+in this case, `users.user.card` route resolution will be started from `users`, then `users.user`, and at the end `users.user.card`;
+
+it mean we could "chain" resolvers:
+
+```ts
+router.addResolver('users', () => {
+  return [ { cards: [ { name: "hello" }]  }];
+});
+
+router.addResolver('users.user', () => {
+  const users = router.dataForRoute('users');
+  return users[0]; // { cards: [ { name: "hello" } ] }
+});
+
+router.addResolver('users.user.card', () => {
+  const user = router.dataForRoute('users.user');
+  return user.cards[0]; // { name: "hello" }
+});
+```
+
+by default, resolved data cached by key params, way to invalidate it -
+
+```ts
+router.unloadRouteData('users');
+```
+
+in this case, this route will reload data
+
+
+
+Chained routing example:
+
+```ts
+// components/layout.js
+import type { Page } from '@lifeart/tiny-router';
+import { router } from './router.ts';
+import { tracked } from '@glimmer/tracking';
+
+import NotFoundComponent from './components/pages/not-found.hbs';
+
+class StackedRoute extends Component {
+  get tail() {
+    return this.parts.tail;
+  }
+  get parts() {
+    const [ head, ...tail] = this.args.stack;
+    return {
+      head, tail
+    }
+  }
+  get Component() {
+    return this.parts.head.data.component;
+  }
+  get model() {
+    return this.parts.head.data;
+  }
+  static template = hbs`
+    <this.Component @model={{this.model}} @params={{@params}}>
+      <StackedRoute @stack={{this.tail}} @params={{@params}}>
+    </this.Component>
+  `
+}
+
+class RouteComponent extends Component {
+  router = router.addHandler((page, data, stack) = this.navigate(page, data, stack));
+  @tracked stack = [];
+  @tracked params = {};
+  navigate(page: Page, _ : any, stack: [string, any][]) {
+    this.params = page.params;
+    this.stack = stack;
+  }
+  static template = hbs`
+    <StackedRoute @params={{this.params}} @stack={{this.stack}} />
+  `
+}
+```
+
+
+
+
 ## Install
 
 ```sh
@@ -96,20 +191,7 @@ about using the router and subscribing to changes in UI frameworks.
 
 ### Routes
 
-Routes is an object of route’s name to route pattern:
-
-```ts
-new Router({
-  route1: '/',
-  route2: '/path/:var1/and/:var2',
-  route3: [/\/posts\/(draft|new)\/(\d+)/, (type, id) => ({ type, id })]
-})
-```
-
 For string patterns you can use `:name` for variable parts.
-
-Routes can have RegExp patterns. They should be an array with function,
-which convert `()` groups to key-value map.
 
 For TypeScript, you need specify interface with variable names, used in routes.
 

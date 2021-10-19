@@ -13,31 +13,34 @@ __export(exports, {
 });
 class Router {
   constructor(routes) {
+    this.routes = [];
     this._handlers = [];
     this._resolvers = {};
     this.activeRoute = null;
     this.prevRoute = null;
+    this._resolvedData = {};
+    this.stack = [];
     this._domHandlers = [];
     this.prev = "";
-    this.routes = Object.keys(routes).map((name) => {
+    Object.keys(routes).map((name) => {
       let value = routes[name];
-      if (typeof value === "string") {
-        value = value.replace(/\/$/g, "") || "/";
-        let names = (value.match(/\/:\w+/g) || []).map((i) => i.slice(2));
-        let pattern = value.replace(/[\s!#$()+,.:<=?[\\\]^{|}]/g, "\\$&").replace(/\/\\:\w+/g, "/([^/]+)");
-        return [
-          name,
-          RegExp("^" + pattern + "$", "i"),
-          (...matches) => matches.reduce((params, match, index) => {
-            params[names[index]] = match;
-            return params;
-          }, {}),
-          value
-        ];
-      } else {
-        return [name, ...value];
-      }
+      value = value.replace(/\/$/g, "") || "/";
+      let names = (value.match(/\/:\w+/g) || []).map((i) => i.slice(2));
+      let pattern = value.replace(/[\s!#$()+,.:<=?[\\\]^{|}]/g, "\\$&").replace(/\/\\:\w+/g, "/([^/]+)");
+      this._addRoute([
+        name,
+        RegExp("^" + pattern + "$", "i"),
+        (...matches) => matches.reduce((params, match, index) => {
+          params[names[index]] = match;
+          return params;
+        }, {}),
+        value,
+        names
+      ]);
     });
+  }
+  _addRoute(value) {
+    this.routes.push(value);
   }
   getQueryParams(str) {
     const values = str.split("&").reduce((acc, el) => {
@@ -74,18 +77,62 @@ class Router {
       return this;
     } finally {
       if (this.activeRoute) {
-        fn(this.activeRoute.page, this.activeRoute.data);
+        fn(this.activeRoute.page, this.activeRoute.data, this.stack);
       }
     }
   }
+  dataForRoute(routeName) {
+    if (!(routeName in this._resolvedData)) {
+      return null;
+    }
+    return this._resolvedData[routeName].model;
+  }
+  async _resolveRoute(route, params, query) {
+    let data = null;
+    if (!this.shouldResolveRoute(route, params)) {
+      return this.dataForRoute(route);
+    }
+    if (route in this._resolvers) {
+      data = await this._resolvers[route](params, query);
+    }
+    return data;
+  }
+  shouldResolveRoute(name, params) {
+    if (!(name in this._resolvedData)) {
+      return true;
+    }
+    const value = this._resolvedData[name];
+    const route = this.routes.find(([routeName]) => name === routeName);
+    if (!route) {
+      throw new Error(`Unknown route: ${name}, for chained routes, ensure you have defined parents`);
+    }
+    if (route[4].some((key) => value.params[key] !== params[key])) {
+      return true;
+    }
+    return false;
+  }
+  unloadRouteData(routeName) {
+    delete this._resolvedData[routeName];
+  }
   async navigate(page) {
     let data = null;
-    if (page.route in this._resolvers) {
-      data = await this._resolvers[page.route](page.params);
+    let parts = page.route.split(".");
+    let routeParts = [];
+    let routeStack = [];
+    while (parts.length) {
+      routeParts.push(parts.shift());
+      const routeToResolve = routeParts.join(".");
+      data = await this._resolveRoute(routeToResolve, page.params, page.query);
+      routeStack.push({ name: routeToResolve, data });
+      this._resolvedData[routeToResolve] = {
+        model: data,
+        params: page.params
+      };
     }
     this.prevRoute = this.activeRoute;
     this.activeRoute = { page, data };
-    this._handlers.forEach((fn) => fn(page, data));
+    this.stack = routeStack;
+    this._handlers.forEach((fn) => fn(page, data, routeStack));
   }
   async open(path, redirect) {
     let page = this.parse(path);
@@ -155,16 +202,23 @@ class Router {
     this._handlers = [];
   }
 }
-function getPagePath(router, name, params) {
+function getPagePath(router, name, params, query = {}) {
   let route = router.routes.find((i) => i[0] === name);
   if (!route) {
     throw new Error(`Unknown route: ${name}`);
   }
-  return route[3].replace(/\/:\w+/g, (i) => "/" + params[i.slice(2)]);
+  const path = route[3].replace(/\/:\w+/g, (i) => "/" + params[i.slice(2)]);
+  const url = new URL(path);
+  if (Object.keys(query)) {
+    Object.keys(query).forEach((key) => {
+      url.searchParams.set(key, encodeURIComponent(query[key]));
+    });
+  }
+  return url.pathname + url.search;
 }
-function openPage(router, name, params) {
-  router.open(getPagePath(router, name, params));
+function openPage(router, name, params, query) {
+  router.open(getPagePath(router, name, params, query));
 }
-function redirectPage(router, name, params) {
-  router.open(getPagePath(router, name, params), true);
+function redirectPage(router, name, params, query) {
+  router.open(getPagePath(router, name, params, query), true);
 }
