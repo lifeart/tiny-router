@@ -1,6 +1,6 @@
 {
   "name": "@lifeart/tiny-router",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A tiny router for Glimmer applications",
   "keywords": [
     "tiny",
@@ -9,7 +9,7 @@
   ],
   "private": false,
   "scripts": {
-    "build:cjs":  "npx esbuild index.ts --format=cjs --outfile=index.cjs.js",
+    "build:cjs":  "npx esbuild index.ts --format=cjs --outfile=index.cjs",
     "build:module":  "npx esbuild index.ts --format=esm --outfile=index.module.js",
     "build": "yarn build:cjs && yarn build:module"
   },
@@ -18,7 +18,7 @@
   "repository": "lifeart/tiny-route",
   "sideEffects": false,
   "type": "module",
-  "main": "index.cjs.js",
+  "main": "index.cjs",
   "module": "index.module.js",
   "engines": {
     "node": "^12.16.0 || ^14.0.0 || >=16.0.0"
