@@ -1,6 +1,7 @@
 export interface Page {
   path: string;
   route: string;
+  query: Record<string, string>;
   params: RouteParams;
 }
 
@@ -34,15 +35,27 @@ export class Router {
       }
     })
   }
-  parse(path: string): Page | false {
-    path = path.replace(/\/$/, '') || '/'
-    if (this.prev === path) return false
-    this.prev = path
+  getQueryParams(str: string) {
+    const values: Record<string, string> = str.split('&').reduce((acc, el) => {
+        const [key, val] = el.split('=');
+        if (key.trim().length) {
+            acc[key.trim()]= decodeURIComponent(decodeURIComponent(val || ''));
+        }
+        return acc;
+    }, {} as Record<string, string>);
+    return values;
+  }
+  parse(_path: string): Page | false {
+    let rawPath = _path.replace(/\/$/, '') || '/'
+    const [path, qParams = ''] = rawPath.split('?');
+    const qp = this.getQueryParams(qParams);
+    if (this.prev === rawPath) return false
+    this.prev = rawPath
 
     for (let [route, pattern, cb] of this.routes) {
       let match = path.match(pattern)
       if (match) {
-        return { path, route, params: cb(...match.slice(1)) }
+        return { path, route, query: qp, params: cb(...match.slice(1)) }
       }
     }
 
