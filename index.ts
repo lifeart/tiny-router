@@ -105,7 +105,7 @@ export class Router {
     }
   }
   async popstate() {
-    let page = this.parse(location.pathname)
+    let page = this.parse(location.pathname + location.search)
     if (page !== false) {
       await this.navigate(page);
     }
@@ -130,7 +130,7 @@ export class Router {
       if (url.origin === location.origin) {
         event.preventDefault()
         let changed = location.hash !== url.hash
-        this.open(url.pathname)
+        this.open(location.pathname + location.search)
         if (changed) {
           location.hash = url.hash
           if (url.hash === '' || url.hash === '#') {
@@ -141,7 +141,7 @@ export class Router {
     }
   }
   _domHandlers: [HTMLElement | Window, string, (e: any) => any ][] = [];
-  async mount(path = typeof location !== undefined ? location.pathname : '/', ssr = false) {
+  async mount(path = typeof location !== undefined ? location.pathname + location.search: '/', ssr = false) {
     if (!ssr) {
       if (typeof window === 'undefined') {
         throw new Error('Unable to mount in SSR mode');
