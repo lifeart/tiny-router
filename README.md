@@ -9,7 +9,7 @@ A tiny URL router for any app;
 
 ```ts
 // router.ts
-import { Router } from '@lifeart/tiny-router';
+import { Router, Page } from '@lifeart/tiny-router';
 
 // Types for :params in route templates
 interface Routes {
@@ -24,12 +24,38 @@ export const router = new Router<Routes>({
   post: '/posts/:categoryId/:id'
 })
 
+// async data loading per-route
 router.addResolver('post', async function(page) {
   const request = await fetch(`/api/pages/${page.params.id}`);
   const data = await request.json();
 
   return data;
 });
+
+// async component loading per-route
+router.addResolver('category', async function(page) {
+  const MyCategory = await import('./components/my-category');
+
+  return {
+    component: MyCategory.default
+  }
+});
+
+// add all routes handler
+router.addHandler((page: Page, data: any) => {
+  console.log({page, data});
+});
+
+
+
+// router.activeRoute === null
+
+// change router state & resolve route
+await router.mount('/posts/42');
+
+router.activeRoute.page.route === 'category';
+router.activeRoute.page.path === '/posts/42';
+
 ```
 
 Store in active mode listen for `<a>` clicks on `document.body` and Back button
@@ -49,7 +75,7 @@ class RouteComponent extends Component {
   @tracked routeComponent!: Component;
   navigate(page: Page, data: Component) {
     this.page = page;
-    this.routeComponent = data || NotFoundComponent;
+    this.routeComponent = data.component || NotFoundComponent;
   }
 }
 ```
