@@ -130,7 +130,7 @@ export class Router {
       if (url.origin === location.origin) {
         event.preventDefault()
         let changed = location.hash !== url.hash
-        this.open(location.pathname + location.search)
+        this.open(url.pathname + url.search)
         if (changed) {
           location.hash = url.hash
           if (url.hash === '' || url.hash === '#') {
