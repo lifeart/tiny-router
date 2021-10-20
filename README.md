@@ -136,28 +136,53 @@ import { tracked } from '@glimmer/tracking';
 
 import NotFoundComponent from './components/pages/not-found.hbs';
 
-class StackedRoute extends Component {
-  get tail() {
-    return this.parts.tail;
-  }
-  get parts() {
-    const [ head, ...tail] = this.args.stack;
-    return {
-      head, tail
-    }
-  }
-  get Component() {
-    return this.parts.head.data.component;
-  }
-  get model() {
-    return this.parts.head.data;
-  }
-  static template = hbs`
-    <this.Component @model={{this.model}} @params={{@params}}>
-      <StackedRoute @stack={{this.tail}} @params={{@params}}>
-    </this.Component>
-  `
+import Component, { hbs } from '@glimmerx/component';
+
+interface IStackedRouter {
+  stack: { name: string, data: null | unknown }[];
+  components?: Record<string, Component>
 }
+
+
+const DefaultRoute = hbs`
+  {{#if @hasChildren}} {{yield}} {{/if}}
+`;
+
+class StackedRouter extends Component<IStackedRouter> {
+    get tail() {
+      return this.parts.tail;
+    }
+    get parts() {
+      const [ head, ...tail] = this.args.stack;
+      return {
+        head, tail
+      }
+    }
+    get components() {
+      return this.args.components ?? {};
+    }
+    get Component() {
+      return this.model?.component || this.components[this.route] || DefaultRoute;
+    }
+    get route() {
+      return this.parts.head.name;
+    }
+    get model() {
+      return (this.parts.head.data || {}) as Record<string, unknown>;
+    }
+    static template = hbs`
+      {{#if @stack.length}}
+        <this.Component
+          @route={{this.route}}
+          @hasChildren={{this.tail.length}}
+          @model={{this.model}}
+          @params={{@params}}
+        >
+          <StackedRouter @components={{this.components}} @stack={{this.tail}} @params={{@params}} />
+        </this.Component>
+      {{/if}}
+    `
+  }
 
 class RouteComponent extends Component {
   router = router.addHandler((page, data, stack) = this.navigate(page, data, stack));

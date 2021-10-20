@@ -87,7 +87,7 @@ class Router {
     }
     return this._resolvedData[routeName].model;
   }
-  async _resolveRoute(route, params, query) {
+  async resolveRoute(route, params, query) {
     let data = null;
     if (!this.shouldResolveRoute(route, params)) {
       return this.dataForRoute(route);
@@ -122,7 +122,7 @@ class Router {
     while (parts.length) {
       routeParts.push(parts.shift());
       const routeToResolve = routeParts.join(".");
-      data = await this._resolveRoute(routeToResolve, page.params, page.query);
+      data = await this.resolveRoute(routeToResolve, page.params, page.query);
       routeStack.push({ name: routeToResolve, data });
       this._resolvedData[routeToResolve] = {
         model: data,
