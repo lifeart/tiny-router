@@ -18,13 +18,16 @@ export class Router {
     this.routes.push(value);
   }
   private _locationKind: LocationKind = 'pathname';
+  private _locationBase: string = '';
   private _getLocationPath(url: URL | Location) {
     return url[this._locationKind].replace('#', '');
   }
-  constructor(routes: Record<string, string>, options: { 
-    location?: LocationKind
+  constructor(routes: Record<string, string>, options: {
+    location?: LocationKind,
+    base?: string,
   } = { location: 'pathname' }) {
     this._locationKind = options.location ?? 'pathname';
+    this._locationBase = options.base ?? '';
     this.prev = '';
     Object.keys(routes).map(name => {
       let value = routes[name]
@@ -239,7 +242,8 @@ export function getPagePath(router: Router, name: string, params: RouteParams, q
     throw new Error(`Unknown route: ${name}`);
   }
   const path = route[3].replace(/\/:\w+/g, i => '/' + params[i.slice(2)]);
-  const url = new URL(path);
+  const prefix = router['_locationKind'] === 'hash' ? router['_locationBase'] + '#' + path : path;
+  const url = new URL(prefix);
   if (Object.keys(query)) {
     Object.keys(query).forEach((key) => {
       url.searchParams.set(key, encodeURIComponent(query[key]));
