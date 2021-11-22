@@ -15,7 +15,7 @@
   },
   "author": "Aleksandr Kanunnikov <lifeart92@gmail.com>",
   "license": "MIT",
-  "repository": "lifeart/tiny-route",
+  "repository": "lifeart/tiny-router",
   "sideEffects": false,
   "type": "module",
   "main": "index.cjs",
