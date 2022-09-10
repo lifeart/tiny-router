@@ -11,14 +11,7 @@ A tiny URL router for any app;
 // router.ts
 import { Router, Page } from '@lifeart/tiny-router';
 
-// Types for :params in route templates
-interface Routes {
-  home: void
-  category: 'categoryId'
-  post: 'categoryId' | 'id'
-}
-
-export const router = new Router<Routes>({
+export const router = new Router({
   home: '/',
   category: '/posts/:categoryId',
   post: '/posts/:categoryId/:id'
