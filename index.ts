@@ -10,14 +10,24 @@ export type QueryParams = Record<string, string>;
 
 type RoteMeta = [string, RegExp, (...args: string[]) => RouteParams, string, string[]];
 type RouteResolvedData = { name: string, data: any };
-
+type LocationKind = 'pathname' | 'hash';
 export class Router {
   routes: RoteMeta[] = [];
   prev!: string
   _addRoute(value: RoteMeta) {
     this.routes.push(value);
   }
-  constructor(routes: Record<string, string>) {
+  private _locationKind: LocationKind = 'pathname';
+  private _locationBase: string = '';
+  private _getLocationPath(url: URL | Location) {
+    return url[this._locationKind].replace('#', '');
+  }
+  constructor(routes: Record<string, string>, options: {
+    location?: LocationKind,
+    base?: string,
+  } = { location: 'pathname' }) {
+    this._locationKind = options.location ?? 'pathname';
+    this._locationBase = options.base ?? '';
     this.prev = '';
     Object.keys(routes).map(name => {
       let value = routes[name]
@@ -157,7 +167,7 @@ export class Router {
     }
   }
   async popstate() {
-    let page = this.parse(location.pathname + location.search)
+    let page = this.parse(this._getLocationPath(location) + location.search)
     if (page !== false) {
       await this.navigate(page);
     }
@@ -182,7 +192,7 @@ export class Router {
       if (url.origin === location.origin) {
         event.preventDefault()
         let changed = location.hash !== url.hash
-        this.open(url.pathname + url.search)
+        this.open(this._getLocationPath(url) + url.search)
         if (changed) {
           location.hash = url.hash
           if (url.hash === '' || url.hash === '#') {
@@ -193,7 +203,7 @@ export class Router {
     }
   }
   _domHandlers: [HTMLElement | Window, string, (e: any) => any ][] = [];
-  async mount(path = typeof location !== undefined ? location.pathname + location.search: '/', ssr = false) {
+  async mount(path = typeof location !== undefined ? this._getLocationPath(location) + location.search: '/', ssr = false) {
     if (!ssr) {
       if (typeof window === 'undefined') {
         throw new Error('Unable to mount in SSR mode');
@@ -232,14 +242,15 @@ export function getPagePath(router: Router, name: string, params: RouteParams, q
     throw new Error(`Unknown route: ${name}`);
   }
   const path = route[3].replace(/\/:\w+/g, i => '/' + params[i.slice(2)]);
-  const url = new URL(path);
+  const prefix = router['_locationKind'] === 'hash' ? router['_locationBase'] + '#' + path : path;
+  const url = new URL(prefix);
   if (Object.keys(query)) {
     Object.keys(query).forEach((key) => {
       url.searchParams.set(key, encodeURIComponent(query[key]));
     })
   }
   // url.searchParams.set(key, encodeURIComponent(value));
-  return url.pathname + url.search;
+  return router['_getLocationPath'](url) + url.search;
 }
 
 export function openPage(router: Router, name: string, params: RouteParams, query?: QueryParams ) {
