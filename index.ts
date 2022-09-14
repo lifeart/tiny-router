@@ -18,7 +18,6 @@ export class Router {
     this.routes.push(value);
   }
   constructor(routes: Record<string, string>) {
-    this.prev = '';
     Object.keys(routes).map(name => {
       let value = routes[name]
       value = value.replace(/\/$/g, '') || '/'
@@ -54,8 +53,6 @@ export class Router {
     let rawPath = _path.replace(/\/$/, '') || '/'
     const [path, qParams = ''] = rawPath.split('?');
     const qp = this.getQueryParams(qParams);
-    if (this.prev === rawPath) return false
-    this.prev = rawPath
 
     for (let [route, pattern, cb] of this.routes) {
       let match = path.match(pattern)
